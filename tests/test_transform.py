@@ -74,3 +74,9 @@ def test_skills():
 def test_redact():
     out = redact_contacts("Email hr@company.co.ke or call 0712 345 678")
     assert "@" not in out and "678" not in out
+
+
+def test_open_ended_text_salary_is_ignored():
+    assert parse_salary_text("Monthly salary: up to KES 100,000 paid monthly") is None
+    s = parse_salary_text("Salary from KES 50,000 to 70,000 per month")
+    assert (s["min_monthly_kes"], s["max_monthly_kes"]) == (50000, 70000)

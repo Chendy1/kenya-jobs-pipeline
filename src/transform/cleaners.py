@@ -104,7 +104,6 @@ def clean_title(raw: str | None) -> str:
     return _fix_case(t)
 
 
-
 _LEVELS = [
     ("director", r"\b(director|vp|vice president|ceo|cfo|coo|cto|cio|chief (?:executive|financial|operating|technology|information|marketing|people|human resources?) officer)\b"),
     ("manager", r"\b(manager|head of|superintendent)\b"),
@@ -113,6 +112,7 @@ _LEVELS = [
     ("junior", r"\b(junior|jr|entry level|graduate)\b"),
     ("intern", r"\b(intern|interns|internship|attachment|attache|trainee|apprentice)\b"),
 ]
+
 
 def seniority(title: str | None) -> str:
     t = norm_text(title)
@@ -151,6 +151,13 @@ _AMT = r"\d[\d,]*(?:\.\d+)?"
 _SAL_RE = re.compile(
     rf"(?<![A-Za-z])(?P<cur>{_CUR})\.?\s*(?P<lo>{_AMT})\s*(?P<lok>[km])?\b"
     rf"(?:\s*(?:-|–|—|to)\s*(?:{_CUR}\.?\s*)?(?P<hi>{_AMT})\s*(?P<hik>[km])?\b)?",
+    re.I,
+)
+
+# "up to KES 100,000" / "from KES 50,000" state one bound, not a salary.
+_OPEN_ENDED = re.compile(
+    r"\b(?:up\s*to|as\s+(?:much|high)\s+as|maximum|max\.?|from|starting(?:\s+at|\s+from)?"
+    r"|minimum|min\.?|over|above)\W*$",
     re.I,
 )
 
@@ -230,6 +237,9 @@ def parse_salary_text(text: str | None) -> dict | None:
         lo, hi = _num(m["lo"]), _num(m["hi"])
         if not cur or lo is None:
             continue
+        before = text[max(0, m.start() - 25): m.start()]
+        if m["hi"] is None and _OPEN_ENDED.search(before):
+            continue  # a single bound is a ceiling/floor, not a salary
         lok, hik = (m["lok"] or "").lower(), (m["hik"] or "").lower()
         if hi is not None and not lok and hik and lo < 1000:  # "50 - 80k"
             lok = hik
