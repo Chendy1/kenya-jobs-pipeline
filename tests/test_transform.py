@@ -34,6 +34,8 @@ def test_seniority():
     assert seniority("Fleet Manager") == "manager"
     assert seniority("Trainee Dealer") == "intern"
     assert seniority("Sales Field Agent") == "unspecified"
+    assert seniority("Chief Accountant") == "senior"
+    assert seniority("Chief Executive Officer") == "director"
 
 
 def test_company_norm():

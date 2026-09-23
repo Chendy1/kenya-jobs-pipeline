@@ -104,15 +104,15 @@ def clean_title(raw: str | None) -> str:
     return _fix_case(t)
 
 
+
 _LEVELS = [
-    ("director", r"\b(director|chief|vp|vice president|ceo|cfo|coo|cto|cio)\b"),
+    ("director", r"\b(director|vp|vice president|ceo|cfo|coo|cto|cio|chief (?:executive|financial|operating|technology|information|marketing|people|human resources?) officer)\b"),
     ("manager", r"\b(manager|head of|superintendent)\b"),
-    ("senior", r"\b(senior|sr|lead|principal|team leader)\b"),
+    ("senior", r"\b(senior|sr|lead|principal|chief|team leader)\b"),
     ("mid", r"\b(mid level|mid|intermediate)\b"),
     ("junior", r"\b(junior|jr|entry level|graduate)\b"),
     ("intern", r"\b(intern|interns|internship|attachment|attache|trainee|apprentice)\b"),
 ]
-
 
 def seniority(title: str | None) -> str:
     t = norm_text(title)

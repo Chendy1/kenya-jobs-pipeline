@@ -6,7 +6,8 @@ from urllib.parse import urldefrag, urljoin, urlparse
 
 from bs4 import BeautifulSoup
 
-from src.extractors.jsonld import extract_job_posting
+
+from src.extractors.jsonld import build_record
 from src.pipeline.ingest import ingest
 from src.storage.raw_store import get_store
 from src.utils.http import PoliteSession, RobotsDisallowed
@@ -53,18 +54,14 @@ def run(source, listing_url, pattern, max_jobs, backend=None):
             print("failed:", url, e)
             failed += 1
             continue
-        posting = extract_job_posting(resp.text)
-        if posting is None:
+        record = build_record(source, url, resp.text, datetime.now(timezone.utc).isoformat())
+        if record is None:
             print("no JobPosting JSON-LD:", url)
             failed += 1
             continue
-        records.append({
-            "source": source,
-            "url": url,
-            "fetched_at": datetime.now(timezone.utc).isoformat(),
-            "job_posting": posting,
-        })
+        records.append(record)
         snapshots[key] = resp.text
+        
 
     inserted = 0
     if records:

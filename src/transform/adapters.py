@@ -35,15 +35,28 @@ def _location_text(job_location) -> str:
     return ", ".join(parts)
 
 
+def _location_from_page(page_meta, title) -> str | None:
+    """BrighterMonday's og:title is '<title> in <place>' ('... in Kenya' when unspecified)."""
+    og = ((page_meta or {}).get("og_title") or "").strip()
+    prefix = f"{title or ''} in "
+    if title and og.lower().startswith(prefix.lower()):
+        return og[len(prefix):].strip() or None
+    return None
+
+
 def jsonld_adapter(payload: dict) -> dict:
     jp = payload.get("job_posting") or payload
     org = _first(jp.get("hiringOrganization"))
     company = org.get("name") if isinstance(org, dict) else org
+    parts = [
+        _location_from_page(payload.get("page_meta"), jp.get("title")),
+        _location_text(jp.get("jobLocation")),
+    ]
     return {
         "url": payload.get("url") or jp.get("url"),
         "title": jp.get("title"),
         "company": str(company) if company else None,
-        "location_text": _location_text(jp.get("jobLocation")),
+        "location_text": ", ".join(dict.fromkeys(p for p in parts if p)),
         "remote_hint": str(jp.get("jobLocationType", "")).upper() == "TELECOMMUTE",
         "date_posted": jp.get("datePosted"),
         "valid_through": jp.get("validThrough"),
