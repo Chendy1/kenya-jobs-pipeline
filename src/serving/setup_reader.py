@@ -11,13 +11,23 @@ from psycopg import sql
 
 from src.storage.postgres import get_conn, init_schema
 
+
 READER_VIEWS = [
     "dw.v_public_jobs",
     "ops.v_public_dq_summary",
     "ops.v_public_runs",
     "ops.v_public_source_freshness",
+    # analytics: aggregates only (the base view v_analytics_base is deliberately NOT granted)
+    "dw.v_coverage_overall",
+    "dw.v_coverage_sources",
+    "dw.v_skill_demand",
+    "dw.v_county_summary",
+    "dw.v_weekly_new_postings",
+    "dw.v_advertised_window_stats",
+    "dw.v_feed_depth",
+    "dw.v_lifetime_km",
+    "dw.v_lifetime_summary",
 ]
-
 
 def setup() -> str:
     user = os.getenv("APP_DB_USER", "app_reader")

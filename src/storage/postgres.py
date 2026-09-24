@@ -28,6 +28,7 @@ def get_conn() -> psycopg.Connection:
         dbname=os.getenv("POSTGRES_DB", "kenya_jobs"),
         user=os.getenv("POSTGRES_USER", "jobs_user"),
         password=os.environ["POSTGRES_PASSWORD"],
+        connect_timeout=3,
     )
 
 

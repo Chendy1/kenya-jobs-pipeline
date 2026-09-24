@@ -7,8 +7,9 @@ from __future__ import annotations
 import pandas as pd
 import streamlit as st
 
-from jobs_db import mode, query_df
 
+import insights
+from jobs_db import mode, query_df
 st.set_page_config(page_title="Kenya Jobs Explorer", layout="wide")
 
 PRIVATE = mode() == "private"
@@ -88,9 +89,9 @@ if PRIVATE:
 st.caption("Job listings collected from Kenyan boards and licensed APIs. Titles and links only: "
            "open the link to read the full posting at its source.")
 
-tab_jobs, tab_overview, tab_health, tab_about = st.tabs(
-    ["Jobs", "Overview", "Pipeline health", "About"])
 
+tab_jobs, tab_overview, tab_insights, tab_health, tab_about = st.tabs(
+    ["Jobs", "Overview", "Insights", "Pipeline health", "About"])
 # ---------------------------------------------------------------- jobs
 with tab_jobs:
     opts = filter_options()
@@ -183,7 +184,8 @@ with tab_overview:
                              "GROUP BY 1 ORDER BY 1")
             daily["date_posted"] = pd.to_datetime(daily["date_posted"])
             st.line_chart(daily, x="date_posted", y="postings")
-
+with tab_insights:
+    insights.render()
 # ---------------------------------------------------------------- pipeline health
 with tab_health:
     runs = query_df("SELECT * FROM ops.v_public_runs")
