@@ -102,9 +102,9 @@ def reliefweb_adapter(payload: dict) -> dict:
         "salary_text": None,
     }
 
-
 def jsearch_adapter(payload: dict) -> dict:
-    j = payload.get("job") or {}
+    j = {**(payload.get("observed") or {}), **(payload.get("job") or {})}
+
     currency = j.get("job_salary_currency") or _currency_from_text(j.get("job_salary_string"))
     base = None
     # no currency, no salary: assuming KES for a USD figure would corrupt the analytics

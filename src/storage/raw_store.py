@@ -18,7 +18,8 @@ load_dotenv()
 _KEY_FIELDS = ("url", "job_url", "source_url", "link", "id", "job_id", "identifier")
 
 # Fields that change on every fetch and must not count as "the posting changed"
-VOLATILE_FIELDS = {"fetched_at", "scraped_at"}
+
+VOLATILE_FIELDS = {"fetched_at", "scraped_at", "observed"}
 
 
 def utcnow() -> datetime:

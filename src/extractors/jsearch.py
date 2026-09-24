@@ -1,10 +1,16 @@
 """JSearch (OpenWeb Ninja): licensed jobs API. Free tier = 200 requests/month, hard limit.
 
 Each page is one request, so the per-run cap (JSEARCH_MAX_REQUESTS, default 4) is spread across
-queries to keep a daily schedule inside the monthly allowance."""
+queries to keep a daily schedule inside the monthly allowance.
+
+JSearch's job_id changes from one search to the next, so identity comes from the content
+(employer + title + place). Fields that vary between calls are stored under "observed",
+which the content hash ignores."""
 from __future__ import annotations
 
+import hashlib
 import os
+import re
 from typing import Callable, Iterator
 
 from src.extractors.base import Extractor, Fetched
@@ -17,6 +23,23 @@ DEFAULT_QUERIES = [
     "software developer jobs in Nairobi, Kenya",
     "jobs in Mombasa, Kenya",
 ]
+
+# Stored with the record, ignored by the content hash (see VOLATILE_FIELDS in raw_store.py).
+_OBSERVED = ("job_id", "job_google_link", "job_apply_link", "job_publisher", "apply_options",
+             "job_posted_at_timestamp", "job_posted_at_datetime_utc")
+
+
+def _norm(value) -> str:
+    return re.sub(r"[^a-z0-9]+", " ", str(value or "").lower()).strip()
+
+
+def fingerprint(job: dict) -> str | None:
+    """Stable identity: the same employer + title + place is the same posting."""
+    employer, title = _norm(job.get("employer_name")), _norm(job.get("job_title"))
+    if not employer or not title:
+        return None
+    place = _norm(job.get("job_location") or job.get("job_city"))
+    return hashlib.sha1(f"{employer}|{title}|{place}".encode()).hexdigest()[:20]
 
 
 class JSearchExtractor(Extractor):
@@ -58,14 +81,16 @@ class JSearchExtractor(Extractor):
                 jobs = (data.get("jobs") if isinstance(data, dict) else data) or []
                 cursor = (data.get("cursor") if isinstance(data, dict) else None) or body.get("cursor")
                 for job in jobs:
-                    job_id = job.get("job_id")
-                    if not job_id or job_id in seen:
+                    key = fingerprint(job) or job.get("job_id")
+                    if not key or key in seen:
                         continue
-                    seen.add(job_id)
-                    # "6 days ago" changes every day and would create a new raw version daily
-                    job = {k: v for k, v in job.items() if k != "job_posted_at"}
-                    yield Fetched(record={"source": self.source, "job_id": job_id,
-                                          "fetched_at": utcnow().isoformat(), "job": job})
+                    seen.add(key)
+                    observed = {k: job[k] for k in _OBSERVED if k in job}
+                    # "6 days ago" changes daily, so it is dropped rather than stored
+                    stable = {k: v for k, v in job.items() if k not in _OBSERVED and k != "job_posted_at"}
+                    yield Fetched(record={"source": self.source, "job_id": key,
+                                          "fetched_at": utcnow().isoformat(),
+                                          "observed": observed, "job": stable})
                     got += 1
                     if got >= max_items:
                         return

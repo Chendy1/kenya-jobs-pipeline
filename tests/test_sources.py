@@ -110,3 +110,20 @@ def test_jsearch_respects_request_cap_and_drops_relative_time(monkeypatch):
     items = list(ex.fetch(10, lambda _id: False))
     assert len(calls) == 2 and len(items) == 2
     assert "job_posted_at" not in items[0].record["job"]
+
+def test_jsearch_same_job_with_different_ids_gets_one_identity():
+    from src.extractors.jsearch import fingerprint
+
+    a = {"job_id": "AAA", "employer_name": "Acme Ltd", "job_title": "Data Engineer",
+         "job_location": "Nairobi, Kenya"}
+    b = {"job_id": "BBB", "employer_name": "ACME LTD ", "job_title": "data engineer",
+         "job_location": "Nairobi, Kenya"}
+    assert fingerprint(a) == fingerprint(b)
+
+
+def test_observed_fields_never_change_the_content_hash():
+    from src.storage.raw_store import content_hash
+
+    base = {"job_id": "k", "job": {"job_title": "x"}}
+    assert content_hash({**base, "observed": {"job_id": "AAA"}}) == \
+        content_hash({**base, "observed": {"job_id": "BBB"}})

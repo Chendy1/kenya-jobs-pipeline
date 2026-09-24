@@ -6,6 +6,7 @@ extract -> raw layer (+ HTML snapshots) -> Postgres -> sightings log.
     python -m src.pipeline.run_source --source reliefweb --max 100
     python -m src.pipeline.run_source --source jsearch --max 30
     python -m src.pipeline.run_source --source jsearch --quota
+    python -m src.pipeline.run_source --source jsearch --force     # ignore the quota guard
 """
 from __future__ import annotations
 
@@ -17,24 +18,45 @@ from src.extractors.base import html_key
 from src.extractors.policy import POLICY, SourceNotAllowed
 from src.extractors.registry import available, build
 from src.pipeline.ingest import ingest
-from src.storage.postgres import fresh_keys, record_sightings
+from src.storage.postgres import fresh_keys, get_conn, record_sightings
 from src.storage.raw_store import get_store, job_key, utcnow
 
 log = logging.getLogger(__name__)
 
+# Quota protection: these API sources run at most once per this many hours unless forced.
+MIN_HOURS_BETWEEN_RUNS = {"jsearch": 20, "jooble": 20, "reliefweb": 20}
+
+
+def hours_since_last_run(source: str) -> float | None:
+    with get_conn() as conn:
+        row = conn.execute(
+            "SELECT extract(epoch FROM now() - max(loaded_at)) / 3600 "
+            "FROM raw.ingest_runs WHERE source = %s", (source,)).fetchone()
+    return float(row[0]) if row and row[0] is not None else None
+
 
 def run(source: str, max_items: int = 30, backend: str | None = None,
-        refresh_days: int = 14, **opts) -> dict:
-    extractor = build(source, **opts)  # the policy check happens inside build()
+        refresh_days: int = 14, force: bool = False, **opts) -> dict:
+    extractor = build(source, **opts)  # policy check + credentials check happen here
+
+    gate = MIN_HOURS_BETWEEN_RUNS.get(source)
+    if gate and not force:
+        hours = hours_since_last_run(source)
+        if hours is not None and hours < gate:
+            log.warning("%s throttled: last run %.1f h ago (minimum %d h). Use --force to override.",
+                        source, hours, gate)
+            return {"source": source, "status": "throttled", "seen": 0, "skipped_known": 0,
+                    "fetched": 0, "new_rows": 0}
+
     store = get_store(backend)
     day = utcnow().strftime("%Y-%m-%d")
     fresh = fresh_keys(source, refresh_days)
-    skipped_known = 0
+    known_skipped: set[str] = set()
 
     def already_done(snapshot_id: str) -> bool:
-        nonlocal skipped_known
         done = snapshot_id in fresh or store.exists(html_key(source, snapshot_id, day))
-        skipped_known += int(done)
+        if done:
+            known_skipped.add(snapshot_id)  # a set: the same URL can show up on several listings
         return done
 
     records, snapshots = [], {}
@@ -54,9 +76,12 @@ def run(source: str, max_items: int = 30, backend: str | None = None,
     seen_keys = set(getattr(extractor, "seen", set())) | fetched_keys
     record_sightings(source, seen_keys, fetched_keys)
 
-    result = {"source": source, "seen": len(seen_keys), "skipped_known": skipped_known,
+    result = {"source": source, "status": "ok" if seen_keys else "empty",
+              "seen": len(seen_keys), "skipped_known": len(known_skipped),
               "fetched": len(records), "new_rows": inserted}
-    log.info("%(source)s: seen=%(seen)d skipped_known=%(skipped_known)d "
+    if not seen_keys:
+        log.warning("%s returned nothing: check credentials, filters or coverage", source)
+    log.info("%(source)s: status=%(status)s seen=%(seen)d skipped_known=%(skipped_known)d "
              "fetched=%(fetched)d new_rows=%(new_rows)d", result)
     return result
 
@@ -69,6 +94,7 @@ def main() -> None:
     ap.add_argument("--max", type=int, default=30)
     ap.add_argument("--refresh-days", type=int, default=14,
                     help="re-download a posting only if last fetched more than this many days ago")
+    ap.add_argument("--force", action="store_true", help="ignore the once-per-20-hours API quota guard")
     ap.add_argument("--pages", type=int, default=2, help="myjobmag: listing pages to read")
     ap.add_argument("--listing", help="myjobmag: a listing URL instead of the homepage feed")
     ap.add_argument("--backend", choices=["local", "s3"])
@@ -91,7 +117,7 @@ def main() -> None:
         if args.quota:
             print(build("jsearch").usage())
             return
-        run(args.source, args.max, args.backend, args.refresh_days, **opts)
+        run(args.source, args.max, args.backend, args.refresh_days, args.force, **opts)
     except SourceNotAllowed as exc:
         raise SystemExit(f"Refused: {exc}")
 
