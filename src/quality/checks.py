@@ -164,6 +164,7 @@ def all_checks() -> list[Check]:
         expression_is_true(fact, "days_advertised >= 0", "days_advertised_non_negative"),
         expression_is_true(fact, "last_seen_date_key >= first_seen_date_key", "last_seen_after_first_seen"),
         expression_is_true(fact, "location_key <> -1", "location_known", severity="warn", max_fraction=0.20),
+        expression_is_true("dw.v_public_jobs", "category <> 'Other'", "category_assigned",severity="warn", max_fraction=0.35),
         custom("dw.fact_matches_clean", "dw",
                "SELECT abs((SELECT count(*) FROM dw.fact_job_postings) - "
                "(SELECT count(*) FROM clean.job_postings)), (SELECT count(*) FROM clean.job_postings)",
