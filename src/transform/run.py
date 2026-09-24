@@ -104,7 +104,10 @@ def transform_row(row: dict) -> tuple[dict, list[tuple[str, str]]]:
     title = clean_title(title_raw)
     desc = redact_contacts(html_to_text(a.get("description_html")))
     loc = map_location(a.get("location_text"))
-    salary = parse_salary_structured(a.get("base_salary")) or parse_salary_text(desc) or {}
+    
+    salary = (parse_salary_structured(a.get("base_salary"))
+              or parse_salary_text(a.get("salary_text"))
+              or parse_salary_text(desc) or {})
     company = clean_company(a.get("company"))
     c_norm, t_norm = company_norm(company), norm_text(title)
     dedup_key = None
