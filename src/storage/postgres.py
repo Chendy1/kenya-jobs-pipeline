@@ -61,3 +61,32 @@ def load_envelopes(envelopes: list[dict], raw_key: str | None = None) -> int:
         )
     log.info("Postgres: %d seen, %d new", len(rows), inserted)
     return inserted
+SIGHTING_SQL = """
+INSERT INTO raw.sightings (source, job_key, seen_on, fetched)
+VALUES (%s, %s, (now() AT TIME ZONE 'Africa/Nairobi')::date, %s)
+ON CONFLICT (source, job_key, seen_on)
+DO UPDATE SET fetched = raw.sightings.fetched OR EXCLUDED.fetched
+"""
+
+
+def record_sightings(source: str, seen_keys: set[str], fetched_keys: set[str]) -> int:
+    """Log that these postings were seen today. Idempotent within a day."""
+    keys = set(seen_keys) | set(fetched_keys)
+    if not keys:
+        return 0
+    rows = [(source, k, k in fetched_keys) for k in sorted(keys)]
+    with get_conn() as conn, conn.cursor() as cur:
+        cur.executemany(SIGHTING_SQL, rows)
+    return len(rows)
+
+
+def fresh_keys(source: str, days: int) -> set[str]:
+    """Postings whose full page we downloaded within the last `days` days."""
+    with get_conn() as conn:
+        rows = conn.execute(
+            "SELECT DISTINCT job_key FROM raw.sightings "
+            "WHERE source = %s AND fetched "
+            "AND seen_on >= (now() AT TIME ZONE 'Africa/Nairobi')::date - %s",
+            (source, days),
+        ).fetchall()
+    return {r[0] for r in rows}

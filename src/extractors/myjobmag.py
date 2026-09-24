@@ -140,20 +140,22 @@ class MyJobMagExtractor(Extractor):
             yield self.listing_url
 
     def fetch(self, max_items: int, already_done: Callable[[str], bool]) -> Iterator[Fetched]:
-        seen: set[str] = set()
+        self.seen = set()  # every posting on the listings we read = "seen today"
+        handled: set[str] = set()
         fetched = 0
         for page_url in self._listing_pages():
+            if fetched >= max_items:
+                break
             try:
                 listing = self.http.get(page_url)
             except RobotsDisallowed:
                 log.warning("robots.txt disallows %s", page_url)
                 continue
             for url in job_links(listing.text, self.BASE):
-                if fetched >= max_items:
-                    return
-                if url in seen or already_done(url):
+                self.seen.add(url)
+                if fetched >= max_items or url in handled or already_done(url):
                     continue
-                seen.add(url)
+                handled.add(url)
                 try:
                     resp = self.http.get(url)
                 except RobotsDisallowed:
@@ -168,3 +170,4 @@ class MyJobMagExtractor(Extractor):
                     continue
                 fetched += 1
                 yield Fetched(record=record, snapshot=resp.text, snapshot_id=url)
+   

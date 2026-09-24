@@ -74,29 +74,39 @@ WHERE c.source = r.source AND c.job_key = r.job_key
 """
 
 
+
 def fetch_latest(conn, sources: list[str] | None) -> list[dict]:
-    """Latest version of each posting, plus when we first and last saw it."""
+    """Latest version of each posting. first/last seen come from the sightings log,
+    falling back to scrape times for postings that have no sightings yet."""
     where = ""
     params = None
     if sources:
         where = "WHERE source IN (" + ", ".join(["%s"] * len(sources)) + ")"
         params = tuple(sources)
     sql = f"""
-        SELECT DISTINCT ON (source, job_key)
-               id, source, job_key, payload, first_seen, last_seen
+        SELECT DISTINCT ON (r.source, r.job_key)
+               r.id, r.source, r.job_key, r.payload,
+               COALESCE(s.first_seen, r.first_scraped) AS first_seen,
+               COALESCE(s.last_seen,  r.last_scraped)  AS last_seen
         FROM (
             SELECT id, source, job_key, payload, scraped_at,
-                   min(scraped_at) OVER (PARTITION BY source, job_key) AS first_seen,
-                   max(scraped_at) OVER (PARTITION BY source, job_key) AS last_seen
+                   min(scraped_at) OVER (PARTITION BY source, job_key) AS first_scraped,
+                   max(scraped_at) OVER (PARTITION BY source, job_key) AS last_scraped
             FROM raw.job_postings
             {where}
-        ) t
-        ORDER BY source, job_key, scraped_at DESC, id DESC
+        ) r
+        LEFT JOIN (
+            SELECT source, job_key,
+                   (min(seen_on)::timestamp + interval '12 hours') AT TIME ZONE 'Africa/Nairobi' AS first_seen,
+                   (max(seen_on)::timestamp + interval '12 hours') AT TIME ZONE 'Africa/Nairobi' AS last_seen
+            FROM raw.sightings
+            GROUP BY source, job_key
+        ) s ON s.source = r.source AND s.job_key = r.job_key
+        ORDER BY r.source, r.job_key, r.scraped_at DESC, r.id DESC
     """
     with conn.cursor(row_factory=dict_row) as cur:
         cur.execute(sql, params)
         return cur.fetchall()
-
 
 def transform_row(row: dict) -> tuple[dict, list[tuple[str, str]]]:
     a = get_adapter(row["source"])(row["payload"])

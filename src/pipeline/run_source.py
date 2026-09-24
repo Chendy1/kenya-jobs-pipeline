@@ -1,4 +1,5 @@
-"""Run any registered source end to end: extract -> raw layer (+ HTML snapshots) -> Postgres.
+"""Run any registered source end to end, incrementally:
+extract -> raw layer (+ HTML snapshots) -> Postgres -> sightings log.
 
     python -m src.pipeline.run_source --list
     python -m src.pipeline.run_source --source myjobmag --max 10 --pages 1
@@ -16,18 +17,25 @@ from src.extractors.base import html_key
 from src.extractors.policy import POLICY, SourceNotAllowed
 from src.extractors.registry import available, build
 from src.pipeline.ingest import ingest
-from src.storage.raw_store import get_store, utcnow
+from src.storage.postgres import fresh_keys, record_sightings
+from src.storage.raw_store import get_store, job_key, utcnow
 
 log = logging.getLogger(__name__)
 
 
-def run(source: str, max_items: int = 30, backend: str | None = None, **opts) -> tuple[int, int]:
+def run(source: str, max_items: int = 30, backend: str | None = None,
+        refresh_days: int = 14, **opts) -> dict:
     extractor = build(source, **opts)  # the policy check happens inside build()
     store = get_store(backend)
     day = utcnow().strftime("%Y-%m-%d")
+    fresh = fresh_keys(source, refresh_days)
+    skipped_known = 0
 
     def already_done(snapshot_id: str) -> bool:
-        return store.exists(html_key(source, snapshot_id, day))
+        nonlocal skipped_known
+        done = snapshot_id in fresh or store.exists(html_key(source, snapshot_id, day))
+        skipped_known += int(done)
+        return done
 
     records, snapshots = [], {}
     for item in extractor.fetch(max_items, already_done):
@@ -41,8 +49,16 @@ def run(source: str, max_items: int = 30, backend: str | None = None, **opts) ->
         # snapshots last: they double as the "already fetched today" marker
         for key, html in snapshots.items():
             store.write(key, gzip.compress(html.encode("utf-8")))
-    log.info("%s: fetched=%d new_rows=%d", source, len(records), inserted)
-    return len(records), inserted
+
+    fetched_keys = {job_key(r) for r in records}
+    seen_keys = set(getattr(extractor, "seen", set())) | fetched_keys
+    record_sightings(source, seen_keys, fetched_keys)
+
+    result = {"source": source, "seen": len(seen_keys), "skipped_known": skipped_known,
+              "fetched": len(records), "new_rows": inserted}
+    log.info("%(source)s: seen=%(seen)d skipped_known=%(skipped_known)d "
+             "fetched=%(fetched)d new_rows=%(new_rows)d", result)
+    return result
 
 
 def main() -> None:
@@ -51,6 +67,8 @@ def main() -> None:
     ap.add_argument("--list", action="store_true", help="show every source and its policy status")
     ap.add_argument("--source")
     ap.add_argument("--max", type=int, default=30)
+    ap.add_argument("--refresh-days", type=int, default=14,
+                    help="re-download a posting only if last fetched more than this many days ago")
     ap.add_argument("--pages", type=int, default=2, help="myjobmag: listing pages to read")
     ap.add_argument("--listing", help="myjobmag: a listing URL instead of the homepage feed")
     ap.add_argument("--backend", choices=["local", "s3"])
@@ -73,7 +91,7 @@ def main() -> None:
         if args.quota:
             print(build("jsearch").usage())
             return
-        run(args.source, args.max, args.backend, **opts)
+        run(args.source, args.max, args.backend, args.refresh_days, **opts)
     except SourceNotAllowed as exc:
         raise SystemExit(f"Refused: {exc}")
 
