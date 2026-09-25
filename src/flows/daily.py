@@ -25,7 +25,7 @@ from src.warehouse.build import build
 
 load_dotenv()
 
-DEFAULT_SOURCES = ["myjobmag", "reliefweb", "jsearch", "jooble"]
+DEFAULT_SOURCES = ["myjobmag", "reliefweb", "jsearch", "jooble", "remotive"]
 REQUIRED_ENV = {"reliefweb": "RELIEFWEB_APPNAME", "jsearch": "JSEARCH_API_KEY", "jooble": "JOOBLE_API_KEY"}
 
 

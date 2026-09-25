@@ -38,6 +38,31 @@ def test_policy_gates(monkeypatch):
     monkeypatch.setenv("CONSENT_BRIGHTERMONDAY", "2026-10-01")
     require_allowed("brightermonday")
 
+def test_remotive_location_filter():
+    from src.extractors.remotive import RemotiveExtractor
+
+    ex = RemotiveExtractor()
+    assert ex._relevant({"candidate_required_location": "Kenya"})
+    assert ex._relevant({"candidate_required_location": "Worldwide"})
+    assert ex._relevant({"candidate_required_location": "Africa, remote"})
+    assert not ex._relevant({"candidate_required_location": "USA Only"})
+    assert not ex._relevant({"candidate_required_location": "UK, Ireland"})
+
+
+def test_remotive_adapter():
+    from src.transform.adapters import remotive_adapter
+
+    payload = {"job": {
+        "url": "https://remotive.com/remote-jobs/product/lead-developer-123",
+        "title": "Lead Developer", "company_name": "Acme Remote",
+        "candidate_required_location": "Worldwide", "job_type": "full_time",
+        "category": "Software Development", "publication_date": "2026-09-20T10:00:00",
+        "salary": "$40,000 - $50,000", "tags": ["python", "django"],
+        "description": "<p>Build things.</p>"}}
+    a = remotive_adapter(payload)
+    assert a["company"] == "Acme Remote" and a["remote_hint"] is True
+    assert a["skills_text"] == "python, django"
+
 
 def test_job_links_only_single_job_pages():
     html = ('<a href="/job/a-b">x</a><a href="/job/a-b/save">save</a>'

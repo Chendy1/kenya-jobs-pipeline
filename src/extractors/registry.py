@@ -24,8 +24,12 @@ def _jooble(**kw) -> Extractor:
     from src.extractors.jooble import JoobleExtractor
     return JoobleExtractor()
 
+def _remotive(**kw) -> Extractor:
+    from src.extractors.remotive import RemotiveExtractor
+    return RemotiveExtractor()
 
-FACTORIES = {"myjobmag": _myjobmag, "reliefweb": _reliefweb, "jsearch": _jsearch, "jooble": _jooble}
+
+FACTORIES = {"myjobmag": _myjobmag, "reliefweb": _reliefweb, "jsearch": _jsearch,"jooble": _jooble, "remotive": _remotive}
 
 
 def available() -> list[str]:

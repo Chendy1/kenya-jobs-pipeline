@@ -148,11 +148,30 @@ def jooble_adapter(payload: dict) -> dict:
         "salary_text": j.get("salary"),
     }
 
+def remotive_adapter(payload: dict) -> dict:
+    j = payload.get("job") or {}
+    return {
+        "url": j.get("url"),
+        "title": j.get("title"),
+        "company": j.get("company_name"),
+        "location_text": j.get("candidate_required_location"),
+        "remote_hint": True,  # Remotive lists remote jobs exclusively
+        "date_posted": j.get("publication_date"),
+        "valid_through": None,
+        "employment_type": j.get("job_type"),
+        "industry": j.get("category"),
+        "description_html": j.get("description"),
+        "skills_text": ", ".join(j.get("tags") or []),
+        "base_salary": None,
+        "salary_text": j.get("salary"),
+    }
+
 
 ADAPTERS: dict = {
     "reliefweb": reliefweb_adapter,
     "jsearch": jsearch_adapter,
     "jooble": jooble_adapter,
+    "remotive": remotive_adapter,
 }  # anything not listed (brightermonday, myjobmag) uses the JSON-LD adapter
 
 

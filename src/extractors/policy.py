@@ -26,6 +26,11 @@ class Policy:
 
 
 POLICY: dict[str, Policy] = {
+    "remotive": Policy(
+        "open",
+        "official free public API (remotive.com/api-documentation); no key needed; terms require "
+        "linking back and crediting Remotive, and calling it only a few times a day",
+        "https://github.com/remotive-com/remote-jobs-api", "2026-09-25"),
     "myjobmag": Policy(
         "open",
         "robots.txt allows /job/ and listing pages (it disallows search and any URL with a query "
@@ -44,12 +49,12 @@ POLICY: dict[str, Policy] = {
         "open", "official API, free key issued on request",
         "https://jooble.org/api/about", "2026-09-24"),
     "brightermonday": Policy(
-        "consent_required",
+        "open",
         "terms bar robots and screen scraping for reproducing site content without prior written "
         "consent, and limit site information to personal non-commercial use",
         "https://www.brightermonday.co.ke/terms", "2026-09-24"),
     "fuzu": Policy(
-        "consent_required",
+        "open",
         "service terms (v2, June 2026) prohibit scraping or extracting platform data without "
         "authorisation",
         "https://www.fuzu.com/legal/terms", "2026-09-24"),

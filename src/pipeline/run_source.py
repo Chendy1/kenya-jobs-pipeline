@@ -24,7 +24,8 @@ from src.storage.raw_store import get_store, job_key, utcnow
 log = logging.getLogger(__name__)
 
 # Quota protection: these API sources run at most once per this many hours unless forced.
-MIN_HOURS_BETWEEN_RUNS = {"jsearch": 20, "jooble": 20, "reliefweb": 20}
+
+MIN_HOURS_BETWEEN_RUNS = {"jsearch": 20, "jooble": 20, "reliefweb": 20, "remotive": 12}
 
 
 def hours_since_last_run(source: str) -> float | None:
