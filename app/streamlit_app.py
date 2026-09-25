@@ -9,8 +9,12 @@ import streamlit as st
 
 
 import insights
+
+import styling
 from jobs_db import mode, query_df
-st.set_page_config(page_title="Kenya Jobs Explorer", layout="wide")
+
+st.set_page_config(page_title="Kenya Jobs Explorer", layout="wide", page_icon="🇰🇪")
+styling.inject()
 
 PRIVATE = mode() == "private"
 JOBS = "dw.v_jobs_enriched" if PRIVATE else "dw.v_public_jobs"
@@ -82,13 +86,12 @@ def to_local(df: pd.DataFrame, columns: list[str]) -> pd.DataFrame:
 
 
 # ---------------------------------------------------------------- header
-st.title("Kenya Jobs Explorer")
+
+styling.header("Kenya Jobs Explorer",
+               "Job listings collected from Kenyan boards and licensed APIs — search, filter, and follow the link back to the source.")
 if PRIVATE:
     st.error("PRIVATE MODE: this view includes sources that are not cleared for publication. "
              "Use it only on your own machine. Never deploy it or share screenshots.")
-st.caption("Job listings collected from Kenyan boards and licensed APIs. Titles and links only: "
-           "open the link to read the full posting at its source.")
-
 
 tab_jobs, tab_overview, tab_insights, tab_health, tab_about = st.tabs(
     ["Jobs", "Overview", "Insights", "Pipeline health", "About"])
@@ -112,8 +115,9 @@ with tab_jobs:
 
     df = search(text, counties, categories, seniorities, sources, skills, skills_mode,
                 days, salary_only, remote_only)
+    
     if df.empty:
-        st.info("No postings match these filters. Try widening them.")
+        styling.empty_state("🔍", "No postings match these filters. Try widening the county, category, or date range.")
     else:
         total = int(df["total"].iloc[0])
         st.write(f"**{total:,}** matching postings" + (f" (showing the newest {LIMIT})" if total > LIMIT else ""))
@@ -197,7 +201,8 @@ with tab_health:
         hours = (now - pd.to_datetime(last["started_at"], utc=True)).total_seconds() / 3600
         good = runs[runs["status"] == "ok"]
         h1, h2, h3 = st.columns(3)
-        h1.metric("Latest run", str(last["status"]).upper())
+        h1.markdown("**Latest run**")
+        h1.markdown(styling.pill_for_status(str(last["status"])), unsafe_allow_html=True)
         h2.metric("Latest run started", f"{hours:.1f} hours ago")
         h3.metric("Latest successful run",
                   f"{(now - pd.to_datetime(good.iloc[0]['started_at'], utc=True)).total_seconds() / 3600:.1f} hours ago"

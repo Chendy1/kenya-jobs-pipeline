@@ -9,6 +9,8 @@ from decimal import Decimal
 import pandas as pd
 import streamlit as st
 
+
+import styling
 from jobs_db import query_df
 
 MIN_SKILL_N = 5
@@ -30,7 +32,7 @@ def load(sql: str) -> pd.DataFrame:
 def render() -> None:
     cov = load("SELECT * FROM dw.v_coverage_overall").iloc[0]
     if pd.isna(cov["postings"]) or int(cov["postings"]) == 0:
-        st.info("No data to analyse yet.")
+        styling.empty_state("📊", "No data to analyse yet.")
         return
     history = 0 if pd.isna(cov["history_days"]) else int(cov["history_days"])
     src = load("SELECT * FROM dw.v_coverage_sources ORDER BY postings DESC")
