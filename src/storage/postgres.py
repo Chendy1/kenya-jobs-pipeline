@@ -91,3 +91,21 @@ def fresh_keys(source: str, days: int) -> set[str]:
             (source, days),
         ).fetchall()
     return {r[0] for r in rows}
+from contextlib import contextmanager
+
+
+@contextmanager
+def advisory_lock(name: str):
+    """Cross-process lock held for the duration of the block. Yields True if acquired."""
+    conn = get_conn()
+    conn.autocommit = True
+    acquired = False
+    try:
+        acquired = bool(conn.execute("SELECT pg_try_advisory_lock(hashtext(%s))", (name,)).fetchone()[0])
+        yield acquired
+    finally:
+        try:
+            if acquired:
+                conn.execute("SELECT pg_advisory_unlock(hashtext(%s))", (name,))
+        finally:
+            conn.close()

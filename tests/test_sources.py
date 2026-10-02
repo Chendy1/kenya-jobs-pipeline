@@ -152,3 +152,52 @@ def test_observed_fields_never_change_the_content_hash():
     base = {"job_id": "k", "job": {"job_title": "x"}}
     assert content_hash({**base, "observed": {"job_id": "AAA"}}) == \
         content_hash({**base, "observed": {"job_id": "BBB"}})
+
+def test_oyk_post_links_use_the_date_path_pattern():
+    from src.extractors.oyk import post_links
+
+    html = (
+        '<a href="/2026/09/25/103-vacancies-open-at-java-house/">post</a>'
+        '<a href="/about-us/">about</a>'
+        '<a href="/contact/">contact</a>'
+        '<a href="/privacy-policy/">privacy</a>'
+        '<a href="/disclaimer/">disclaimer</a>'
+        '<a href="/goals-and-objectives/">goals</a>'
+        '<a href="/sources-of-the-opportunities-posted-on-oyk/">sources</a>'
+        '<a href="/author/kmax/">author</a>'
+        '<a href="/category/national-government/">cat</a>'
+        '<a href="/page/2/">pager</a>'
+        '<a href="/latest-stories/">archive</a>'
+        '<a href="https://other.com/2026/09/25/x/">off-site</a>'
+        '<a href="/2026/09/25/103-vacancies-open-at-java-house/">dup</a>'
+    )
+    assert post_links(html, "https://opportunitiesforyoungkenyans.co.ke") == [
+        "https://opportunitiesforyoungkenyans.co.ke/2026/09/25/103-vacancies-open-at-java-house/"]
+    
+def test_oyk_article_parsing():
+    from src.extractors.oyk import company_from_title, parse_post
+    from src.transform.adapters import jsonld_adapter
+    from src.transform.counties import map_location
+
+    assert company_from_title("103 Vacancies Open At Java House") == "Java House"
+    assert company_from_title("Internship Opportunities Open At Java House") == "Java House"
+    assert company_from_title("United Nation Hiring Marketing Intern") == "United Nation"
+    assert company_from_title("Fresh Life Hiring Customer Success &Credit Associate – Eldoret") == "Fresh Life"
+    assert company_from_title("Some Unrelated Headline") is None
+
+    html = (
+        '<html><head><script type="application/ld+json">'
+        '{"@graph":[{"@type":"Article","datePublished":"2026-09-25T16:14:24+03:00"}]}</script></head>'
+        "<body><h1>The Social House Nairobi Announces 6 Job Vacancies – September 2026</h1>"
+        "<article><p>Location: Nairobi, Kenya Employment Type: Full Time Career Level: Experienced "
+        "Application Deadline: 31 October 2026</p></article></body></html>"
+    )
+    rec = parse_post("oyk", "https://opportunitiesforyoungkenyans.co.ke/2026/09/25/x/", html,
+                     "2026-09-28T00:00:00+00:00")
+    jp = rec["job_posting"]
+    assert jp["hiringOrganization"]["name"] == "The Social House Nairobi"
+    assert jp["validThrough"] == "2026-10-31" and jp["employmentType"] == "Full Time"
+    assert jp["datePosted"].startswith("2026-09-25")
+    assert rec["vacancy_count"] == 6 and rec["is_roundup"] is True
+    assert map_location(jsonld_adapter(rec)["location_text"])["county"] == "Nairobi"
+    assert company_from_title("6 Vacancies Open AtNAMICO") == "NAMICO"

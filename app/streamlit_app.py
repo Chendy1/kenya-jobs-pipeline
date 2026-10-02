@@ -9,7 +9,7 @@ import streamlit as st
 
 
 import insights
-
+import cv_match
 import styling
 from jobs_db import mode, query_df
 
@@ -93,8 +93,9 @@ if PRIVATE:
     st.error("PRIVATE MODE: this view includes sources that are not cleared for publication. "
              "Use it only on your own machine. Never deploy it or share screenshots.")
 
-tab_jobs, tab_overview, tab_insights, tab_health, tab_about = st.tabs(
-    ["Jobs", "Overview", "Insights", "Pipeline health", "About"])
+
+tab_jobs, tab_overview, tab_insights, tab_cv, tab_health, tab_about = st.tabs(
+    ["Jobs", "Overview", "Insights", "Match My CV", "Pipeline health", "About"])
 # ---------------------------------------------------------------- jobs
 with tab_jobs:
     opts = filter_options()
@@ -190,6 +191,8 @@ with tab_overview:
             st.line_chart(daily, x="date_posted", y="postings")
 with tab_insights:
     insights.render()
+with tab_cv:
+    cv_match.render()
 # ---------------------------------------------------------------- pipeline health
 with tab_health:
     runs = query_df("SELECT * FROM ops.v_public_runs")

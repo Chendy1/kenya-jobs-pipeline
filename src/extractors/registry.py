@@ -28,8 +28,13 @@ def _remotive(**kw) -> Extractor:
     from src.extractors.remotive import RemotiveExtractor
     return RemotiveExtractor()
 
+def _oyk(**kw) -> Extractor:
+    from src.extractors.oyk import OYKExtractor
+    return OYKExtractor(**kw)
 
-FACTORIES = {"myjobmag": _myjobmag, "reliefweb": _reliefweb, "jsearch": _jsearch,"jooble": _jooble, "remotive": _remotive}
+
+FACTORIES = {"myjobmag": _myjobmag, "reliefweb": _reliefweb, "jsearch": _jsearch,
+            "jooble": _jooble, "remotive": _remotive, "oyk": _oyk}
 
 
 def available() -> list[str]:

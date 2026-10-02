@@ -12,4 +12,5 @@ if __name__ == "__main__":
         cron="0 3 * * *",
         tags=["kenya-jobs"],
         description="All sources -> transform -> warehouse. Idempotent; safe to re-run.",
+        limit=1,  # one flow run at a time on this runner
     )

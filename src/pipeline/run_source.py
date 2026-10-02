@@ -18,7 +18,7 @@ from src.extractors.base import html_key
 from src.extractors.policy import POLICY, SourceNotAllowed
 from src.extractors.registry import available, build
 from src.pipeline.ingest import ingest
-from src.storage.postgres import fresh_keys, get_conn, record_sightings
+from src.storage.postgres import advisory_lock, fresh_keys, get_conn, record_sightings
 from src.storage.raw_store import get_store, job_key, utcnow
 
 log = logging.getLogger(__name__)
@@ -36,7 +36,7 @@ def hours_since_last_run(source: str) -> float | None:
     return float(row[0]) if row and row[0] is not None else None
 
 
-def run(source: str, max_items: int = 30, backend: str | None = None,
+def _run_locked(source: str, max_items: int = 30, backend: str | None = None,
         refresh_days: int = 14, force: bool = False, **opts) -> dict:
     extractor = build(source, **opts)  # policy check + credentials check happen here
 
@@ -85,6 +85,18 @@ def run(source: str, max_items: int = 30, backend: str | None = None,
     log.info("%(source)s: status=%(status)s seen=%(seen)d skipped_known=%(skipped_known)d "
              "fetched=%(fetched)d new_rows=%(new_rows)d", result)
     return result
+
+
+def run(source: str, max_items: int = 30, backend: str | None = None,
+        refresh_days: int = 14, force: bool = False, **opts) -> dict:
+    """One run per source at a time, across every process. Two concurrent runs would
+    double the request rate on the site and let the quota check race with itself."""
+    with advisory_lock(f"pipeline:{source}") as acquired:
+        if not acquired:
+            log.warning("%s is already running elsewhere: skipping this run", source)
+            return {"source": source, "status": "busy", "seen": 0, "skipped_known": 0,
+                    "fetched": 0, "new_rows": 0}
+        return _run_locked(source, max_items, backend, refresh_days, force, **opts)
 
 
 def main() -> None:

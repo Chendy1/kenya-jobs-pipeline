@@ -49,12 +49,12 @@ POLICY: dict[str, Policy] = {
         "open", "official API, free key issued on request",
         "https://jooble.org/api/about", "2026-09-24"),
     "brightermonday": Policy(
-        "open",
+        "consent_required",
         "terms bar robots and screen scraping for reproducing site content without prior written "
         "consent, and limit site information to personal non-commercial use",
         "https://www.brightermonday.co.ke/terms", "2026-09-24"),
     "fuzu": Policy(
-        "open",
+        "consent_required",
         "service terms (v2, June 2026) prohibit scraping or extracting platform data without "
         "authorisation",
         "https://www.fuzu.com/legal/terms", "2026-09-24"),
@@ -62,6 +62,13 @@ POLICY: dict[str, Policy] = {
         "unsupported",
         "the Adzuna API has no Kenya market (its only African market is South Africa)",
         "https://developer.adzuna.com/overview", "2026-09-24"),
+        "oyk": Policy(
+        "open",
+        "robots.txt (checked 2026-09-25) allows our User-Agent with Crawl-delay: 120s, no Disallow; "
+        "NOTE: OYK is a self-described secondary aggregator that republishes from undisclosed "
+        "sources, so individual postings' true origin cannot be verified — a posting here may be "
+        "a rewritten copy of a source excluded elsewhere in this project (e.g. BrighterMonday)",
+        "https://opportunitiesforyoungkenyans.co.ke/robots.txt", "2026-09-25"),
 }
 
 

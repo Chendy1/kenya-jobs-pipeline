@@ -25,7 +25,8 @@ from src.warehouse.build import build
 
 load_dotenv()
 
-DEFAULT_SOURCES = ["myjobmag", "reliefweb", "jsearch", "jooble", "remotive"]
+
+DEFAULT_SOURCES = ["myjobmag", "reliefweb", "jsearch", "remotive", "oyk"]
 REQUIRED_ENV = {"reliefweb": "RELIEFWEB_APPNAME", "jsearch": "JSEARCH_API_KEY", "jooble": "JOOBLE_API_KEY"}
 
 
@@ -52,9 +53,10 @@ def configured_sources(requested: list[str] | None = None) -> tuple[list[str], d
 @task(name="extract-and-load", retries=2, retry_delay_seconds=[60, 300])
 def extract_source(source: str, max_items: int, refresh_days: int) -> dict:
     logger = get_run_logger()
-    opts = {"pages": 2} if source == "myjobmag" else {}
+    opts = {"pages": 2} if source in ("myjobmag", "oyk") else {}
     try:
-        return run_source(source, max_items, refresh_days=refresh_days, **opts)
+        limit = min(max_items, 8) if source == "oyk" else max_items  # 120s crawl-delay per request
+        return run_source(source, limit, refresh_days=refresh_days, **opts)
     except SourceNotAllowed as exc:  # a policy decision, not an outage: never retry
         logger.warning("%s refused: %s", source, exc)
         return {"source": source, "status": "refused", "reason": str(exc)}
@@ -108,7 +110,7 @@ def _execute(sources, max_items: int, refresh_days: int, skip_extract: bool) -> 
             errors.append(f"source {source} failed: {outcomes[source]['reason']}")
         elif status == "empty":
             warnings.append(f"source {source} returned nothing")
-        elif status in ("refused", "throttled"):
+        elif status in ("refused", "throttled", "busy"):
             notes.append(f"{source}: {status}")
 
     # Gate 1 (raw): if the raw layer is bad, touch nothing downstream.

@@ -10,10 +10,11 @@ def test_configured_sources_skips_unconfigured(monkeypatch):
     for var in ("RELIEFWEB_APPNAME", "JSEARCH_API_KEY", "JOOBLE_API_KEY"):
         monkeypatch.delenv(var, raising=False)
     monkeypatch.setenv("JSEARCH_API_KEY", "x")
+    
+    
     ready, skipped = configured_sources(None)
-    assert ready == ["myjobmag", "jsearch"]
-    assert set(skipped) == {"reliefweb", "jooble"}
-
+    assert ready == ["myjobmag", "jsearch", "remotive", "oyk"]
+    assert set(skipped) == {"reliefweb"}
 
 @pytest.fixture
 def db():
@@ -34,3 +35,13 @@ def test_sightings_are_idempotent_within_a_day(db):
                             "WHERE source = 'test_sightings' ORDER BY job_key").fetchall()
     assert rows == [("a", True), ("b", True)]
     assert fresh_keys("test_sightings", 14) == {"a", "b"}
+
+def test_advisory_lock_blocks_a_second_holder(db):
+    from src.storage.postgres import advisory_lock
+
+    with advisory_lock("test:lock") as first:
+        assert first is True
+        with advisory_lock("test:lock") as second:
+            assert second is False
+    with advisory_lock("test:lock") as again:
+        assert again is True
